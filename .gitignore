@@ -3,4 +3,5 @@ credentials/*.json
 *.pem
 .env
 .env.local
+sample.env
 
