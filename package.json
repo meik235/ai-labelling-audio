@@ -1,0 +1,16 @@
+{
+  "name": "label-studio-ml-backend",
+  "version": "1.0.0",
+  "description": "Label Studio ML Backend for audio transcription",
+  "scripts": {
+    "deploy": "serverless deploy",
+    "remove": "serverless remove",
+    "logs": "serverless logs -f predict --tail"
+  },
+  "devDependencies": {
+    "serverless": "^3.38.0",
+    "serverless-python-requirements": "^6.0.0",
+    "serverless-offline": "^13.0.0"
+  }
+}
+

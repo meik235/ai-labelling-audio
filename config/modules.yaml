@@ -1,0 +1,172 @@
+# @format
+
+clientConfig:
+  clientId: "Testing4"
+  workflow:
+    preprocessing:
+      enabled: true
+      description: "Data hygiene + audio cleanup"
+    annotation:
+      enabled: true
+      description: "Label Studio based QA + diarization"
+    postProcessing:
+      enabled: true
+      description: "Merge downstream outputs + export"
+
+  dataSource:
+    type: csv # options: dynamodb | csv | api
+    dynamodb:
+      tableName: "audio-jobs"
+      region: "us-east-1"
+      filterExpression: "clientId = :clientId"
+      projectionFields: [jobId, callId, audioUrl, metadata]
+    csv:
+      path: data/user_responses.csv # user_responses_mono_no_pre.csv, user_responses_mono_with_pre.csv, user_responses_stereo_with_pre.csv
+      delimiter: ","
+    api:
+      endpoint: ""
+      authType: none # none | basic | bearer
+      headers: {}
+    audioLocationPreference:
+      preferred: s3 # s3 | gdrive | other
+      allowFallback: true
+      acceptedLocations: [s3, gdrive]
+
+  preprocessing:
+    s3_prefix: testing1
+    validation:
+      enabled: true # Enabled for testing, but with very permissive limits
+      allowedFormats: ["mp3", "wav", "m4a", "flac", "aac", "ogg"] # Added more formats
+      duration:
+        min: 0.1 # Very low minimum (100ms) - won't reject anything
+        max: 3600 # 1 hour max - very permissive for testing
+      size:
+        max: 1000 # 1000 MB max - very permissive for testing
+      sampleRate:
+        allowed: [8000, 16000, 22050, 32000, 44100, 48000, 96000] # Added more common sample rates
+      download:
+        timeout: 60 # Increased timeout for larger files
+        retry:
+          count: 3
+          delay: 2
+    clearAudio:
+      enabled: true
+      # Simple ffmpeg pass: convert everything to mono 16 kHz WAV for AssemblyAI + QC parity
+      target:
+        format: wav
+        sampleRate: 16000
+      normalization: # normalizes the audio to a standard level (useful for inconsistent audio)
+        enabled: false
+        # mode: "loudnorm"  # or "dynaudnorm" (dynamic normalization)
+        # levelDB: -23.0    # Target loudness in dB (default: -23.0)
+      denoise: # removes background noise (useful for noisy audio)
+        enabled: false
+        # intensity: "medium"  # "low" | "medium" | "high"
+      trim: # removes silence at the start and end of the audio (useful for short audio)
+        enabled: false
+        # silenceThreshold: -40.0    # dB threshold for silence detection
+        # minSilenceDuration: 0.3    # seconds of silence required to trim
+      chunking: # splits the audio into smaller segments (useful for long audio)
+        enabled: false
+        # maxDurationSec: 30.0    # Maximum duration per chunk
+        # overlapSec: 2.0         # Overlap between chunks (prevents word cutting)
+      metadata:
+        includeFields: [duration, size]
+
+  annotation:
+    labelConfig: |
+      <View>
+        <Labels name="labels" toName="audio">
+          <Label value="Speaker one" background="#D186FF" hotkey="1"/>
+          <Label value="Speaker two" background="#1CE6FF" hotkey="2"/>
+        </Labels>
+        <Audio name="audio" value="$audio"/>
+        <TextArea name="transcription_region" toName="audio" perRegion="true" rows="3" editable="true" placeholder="Segment transcription"/>
+      </View>
+    preAnnotation:
+      enabled: true
+      labelSchema:
+        fields: [start, end, label, intent]
+    runSegmentsInLabelStudio: true
+    transcription:
+      enabled: true
+      asr:
+        model: assemblyai
+        # Language setting: "auto" for automatic detection of all languages
+        # Other options: "hinglish" (auto-detect), "hi" (Hindi), "bn" (Bengali), "en" (English only)
+        language: auto
+        task: transcribe
+      timestamp:
+        format: s
+      output:
+        format: json
+      sentiment:
+        enabled: false
+    template:
+      id: default-template
+      version: "1.0"
+      mapping:
+        rules: []
+
+  postProcessing:
+    enabled: true
+    finalReportFormat: csv
+    extractAudioSegments: false
+    mergeStrategy: prefer-human
+    outputFormats: [json, csv, srt, txt]
+
+devConfig:
+  labelStudio:
+    projectNamePrefix: AudioProjectTesting4
+    description: Automated audio annotation pipeline
+    templateId: audio-basic
+    batchSize: 50
+    mlBackend:
+      enabled: false # Disabled - no ML model in Label Studio
+      url: ""
+      token: ""
+    storage:
+      enabled: true # Enable automatic cloud storage configuration
+      type: s3
+      bucket: "" # Set your S3 bucket name here, or use S3_BUCKET env var
+      region: "" # Set AWS region, or use AWS_REGION env var (defaults to ap-south-1)
+      prefix: "" # Optional: S3 prefix/folder path
+      awsAccessKeyId: "" # Optional: Set here or use AWS_ACCESS_KEY_ID env var
+      awsSecretAccessKey: "" # Optional: Set here or use AWS_SECRET_ACCESS_KEY env var
+      useBlobUrls: true
+      sourceEnabled: true
+      targetEnabled: true
+    webhook:
+      enabled: true # Disabled - webhook server not needed if not using auto-export
+      url: "http://localhost:8000/webhooks/label-studio/events"
+    runPreAnnotate: true
+    reviewerIds: []
+    export:
+      format: json
+
+  postProcessing:
+    final_csv_path: ./.tmp/final_report.csv
+    s3_prefix: "testing_output"
+    # Configure which fields from Label Studio to include in final JSON output
+    # Add any custom field names from your Label Studio template here
+    # Field names must match the "name" attribute in your labelConfig (e.g., "transcription_region", "language", "notes", etc.)
+    output_fields: [start, end, speaker, transcription, language, end_of_speech]
+    completionWebhook:
+      url: "http://localhost:8000/webhooks/pipeline-complete" # Enable completion webhook
+      secret: ""
+
+  webhooks:
+    rejection:
+      url: http://localhost:8000/webhooks/label-studio
+      secret: ""
+    labelStudioRejection:
+      url: http://localhost:8000/webhooks/label-studio
+      secret: ""
+    postProcessingComplete:
+      url: http://localhost:8000/webhooks/pipeline-complete
+      secret: ""
+
+  rejectionHandler:
+    lambda:
+      functionName: audio-rejection-handler
+      payloadFields: [row_index, reason, module]

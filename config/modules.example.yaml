@@ -1,0 +1,187 @@
+# @format
+
+clientConfig:
+  clientId: "client-demo"
+
+  workflow:
+    steps: [preprocessing, annotation, postProcessing]
+    preprocessing:
+      enabled: true
+      description: "Validate + clean audio"
+    annotation:
+      enabled: true
+      description: "Label Studio QA workspace"
+    postProcessing:
+      enabled: true
+      description: "Merge downstream deliverables"
+
+  dataSource:
+    type: csv # csv | dynamodb | api
+    csv:
+      path: data/user_responses.csv
+      delimiter: ","
+    dynamodb:
+      tableName: "demo-audio-jobs"
+      region: "us-east-1"
+      filterExpression: "clientId = :clientId"
+      projectionFields: [jobId, callId, audioUrl, metadata]
+    api:
+      endpoint: "https://api.demo.io/v1/jobs"
+      authType: bearer # none | basic | bearer
+      headers:
+        x-demo-client: "client-demo"
+    audioLocationPreference:
+      preferred: s3 # s3 | gdrive | other
+      allowFallback: true
+      acceptedLocations: [s3, gdrive]
+
+  preprocessing:
+    validation:
+      enabled: true
+      allowedFormats: ["mp3", "wav", "m4a"]
+      duration:
+        minSec: 1
+        maxSec: 3600
+      size:
+        maxMB: 200
+      sampleRate:
+        allowed: [16000, 44100]
+      download:
+        timeoutSec: 60
+        retryCount: 2
+        retryDelaySec: 5
+      rejectionWebhook:
+        url: "https://demo.rejection.webhook"
+        secret: "demo-secret-token"
+    clearAudio:
+      enabled: true
+      # Minimal conversion: ensure every asset hits AssemblyAI as mono 16 kHz WAV
+      target:
+        format: "wav"
+        sampleRate: 16000
+      normalization:
+        enabled: false
+      denoise:
+        enabled: false
+      silenceTrim:
+        enabled: false
+      chunking:
+        enabled: false
+      metadata:
+        includeFields: [duration, sample_rate]
+
+  annotation:
+    labelConfig: |
+      <View>
+        <Labels name="labels" toName="audio">
+          <Label value="Speaker one" background="#D186FF"/>
+          <Label value="Speaker two" background="#FFB57F"/>
+        </Labels>
+        <Audio name="audio" value="$audio"/>
+        <TextArea name="transcription" toName="audio" rows="6" placeholder="Clean transcript goes here..."/>
+      </View>
+    preAnnotation:
+      enabled: true
+      labelSchema:
+        fields: [start, end, label, intent]
+    transcription:
+      enabled: true
+      asr:
+        model: assemblyai
+        language: en
+        task: transcribe
+      timestamps:
+        format: s
+      output:
+        format: json
+      sentiment:
+        enabled: false
+    template:
+      id: demo-template
+      version: "1.0"
+      mapping:
+        rules:
+          - from: text
+            to: transcript
+    mlValidation:
+      enabled: false
+      min_confidence: 0.8
+      max_duration_diff_sec: 2.0
+      rules:
+        max_silence_gap_sec: 1.0
+
+  postProcessing:
+    enabled: true
+    finalReportFormat: csv
+    extractAudioSegments: true
+    mergeStrategy: prefer-human
+    outputFormats: [json, csv, srt, txt]
+
+devConfig:
+  ingestion:
+    csv:
+      localFallbackPath: data/user_responses.csv
+    dynamodb:
+      tableName: "demo-audio-jobs"
+      region: "us-east-1"
+      batchSize: 25
+    s3:
+      bucket: "kgen-ai-labelling"
+      rawPrefix: "client/demo-project/raw"
+      processedPrefix: "client/demo-project/preprocessed"
+    runtimeChecks:
+      requireKnownSource: true
+      allowExternalAudio: true
+      externalSources: [gdrive]
+
+  labelStudio:
+    projectNamePrefix: DEMO_
+    description: "Demo audio annotation"
+    templateId: ls_template_demo
+    batchSize: 25
+    mlBackend:
+      enabled: true
+      url: https://demo-ml-backend
+      token: demo-ml-token
+    storage:
+      enabled: true
+      type: s3
+      bucket: "kgen-ai-labelling"
+      prefix: "client/demo-project/raw"
+      region: "ap-south-1"
+      awsAccessKeyId: ""
+      awsSecretAccessKey: ""
+      useBlobUrls: true
+      title: "Demo S3 Storage"
+      sourceEnabled: true
+      targetEnabled: true
+    runPreAnnotate: true
+    reviewerIds: [demoReviewer]
+    export:
+      format: json
+    webhook:
+      enabled: true
+      url: https://demo.labelstudio.webhook
+
+  postProcessing:
+    final_csv_path: ./.tmp/final_report.csv
+    s3_prefix: client/demo-project/deliverables
+    completionWebhook:
+      url: https://demo.completion.webhook
+      secret: demo-completion-secret
+
+  webhooks:
+    rejection:
+      url: https://demo.rejection.webhook
+      secret: demo.reject.secret
+    labelStudioRejection:
+      url: https://demo.labelstudio.rejection
+      secret: demo.labelstudio.secret
+    postProcessingComplete:
+      url: https://demo.postprocess.webhook
+      secret: demo-post-secret
+
+  rejectionHandler:
+    lambda:
+      functionName: DemoRejectionLambda
+      payloadFields: [row_index, reason, module, timestamp]

@@ -1,0 +1,79 @@
+# @format
+
+service: label-studio-ml-backend
+
+frameworkVersion: "3"
+
+provider:
+  name: aws
+  runtime: python3.11
+  region: ap-south-1 # Change to your preferred region
+  timeout: 900 # 15 minutes (max Lambda timeout)
+  memorySize: 1024 # Adjust based on audio file sizes
+  environment:
+    ASSEMBLYAI_API_KEY: ${env:ASSEMBLYAI_API_KEY}
+    ASSEMBLYAI_BASE_URL: ${env:ASSEMBLYAI_BASE_URL, 'https://api.assemblyai.com/v2'}
+    ASSEMBLYAI_POLL_INTERVAL: ${env:ASSEMBLYAI_POLL_INTERVAL, '3.0'}
+    ASSEMBLYAI_AUTO_CHAPTERS: ${env:ASSEMBLYAI_AUTO_CHAPTERS, 'false'}
+    LABEL_STUDIO_AUDIO_FIELD: ${env:LABEL_STUDIO_AUDIO_FIELD, 'audio'}
+    LABEL_STUDIO_BASE_URL: ${env:LABEL_STUDIO_BASE_URL}
+    LABEL_STUDIO_API_KEY: ${env:LABEL_STUDIO_API_KEY}
+    S3_BUCKET: ${env:S3_BUCKET}
+    AWS_ACCESS_KEY_ID: ${env:AWS_ACCESS_KEY_ID}
+    AWS_SECRET_ACCESS_KEY: ${env:AWS_SECRET_ACCESS_KEY}
+    ML_BACKEND_URL: ${env:ML_BACKEND_URL}
+  httpApi:
+    cors: true
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+          Resource: "arn:aws:logs:*:*:*"
+        - Effect: Allow
+          Action:
+            - s3:GetObject
+            - s3:PutObject
+            - s3:ListBucket
+          Resource:
+            - "arn:aws:s3:::${self:custom.bucketName}/*"
+            - "arn:aws:s3:::${self:custom.bucketName}"
+
+functions:
+  predict:
+    handler: lambda/lambda_handler.lambda_handler
+    events:
+      - httpApi:
+          path: /predict
+          method: post
+      - httpApi:
+          path: /health
+          method: get
+    timeout: 900 # 15 minutes
+    memorySize: 1024
+
+  pipeline:
+    handler: lambda/lambda_pipeline_handler.lambda_handler
+    timeout: 900 # 15 minutes (max Lambda timeout)
+    memorySize: 2048 # More memory for pipeline processing
+    events:
+      - s3:
+          bucket: ${self:custom.bucketName}
+          event: s3:ObjectCreated:*
+          rules:
+            - prefix: csvUpload/
+            - suffix: .csv
+
+plugins:
+  - serverless-python-requirements
+
+custom:
+  bucketName: ${env:S3_BUCKET, 'kgen-ai-labelling'}
+  pythonRequirements:
+    dockerizePip: non-linux
+    layer: true
+    slim: true
+    strip: false

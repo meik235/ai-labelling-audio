@@ -1,0 +1,10 @@
+/Users/jaya/Library/Python/3.11/lib/python/site-packages/pyannote/audio/core/io.py:43: UserWarning: torchaudio._backend.set_audio_backend has been deprecated. With dispatcher enabled, this function is no-op. You can remove the function call.
+  torchaudio.set_audio_backend("soundfile")
+Loaded environment variables from /Users/jaya/Downloads/AI/.env
+Pipeline running...
+
+Pipeline completed
+- Preprocessing tasks processed: 0
+- Annotation tasks prepared: 0
+- Label Studio project ID: 83
+- Exported tasks: 0

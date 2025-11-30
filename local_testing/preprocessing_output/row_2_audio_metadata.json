@@ -1,0 +1,10 @@
+{
+  "row_index": 2,
+  "channel": "audio",
+  "original_url": "https://kgen-ai-labelling.s3.amazonaws.com/input-audio/stereo.wav",
+  "preprocessing_applied": [
+    "standardization:wav@16000"
+  ],
+  "original_size_bytes": 1920058,
+  "processed_size_bytes": 3840078
+}

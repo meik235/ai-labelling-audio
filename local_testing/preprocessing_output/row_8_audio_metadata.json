@@ -1,0 +1,10 @@
+{
+  "row_index": 8,
+  "channel": "audio",
+  "original_url": "https://kgen-ai-labelling.s3.amazonaws.com/input-audio/6_stereo_bengali_gardening.mp3",
+  "preprocessing_applied": [
+    "standardization:wav@16000"
+  ],
+  "original_size_bytes": 333783,
+  "processed_size_bytes": 665504
+}

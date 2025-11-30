@@ -1,0 +1,32 @@
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+httpx==0.27.0
+pydantic>=2.0.0
+mangum>=0.17.0
+
+# Dependency version constraints to resolve conflicts
+numpy>=1.26.4,<2.0.0  # label-studio compatibility
+protobuf>=3.19.5,<5.0.0  # proto-plus and google-api-core compatibility
+
+# Audio processing and evaluation
+jiwer>=3.0.0  # WER/CER calculation
+librosa>=0.10.0  # Audio analysis (required for heuristic diarization)
+pydub>=0.25.0  # Audio manipulation
+scikit-learn>=1.3.0  # F1, classification metrics
+unidecode>=1.3.0  # Unicode normalization
+sox>=1.4.0  # Audio processing (system dependency, install via system package manager)
+PyYAML>=6.0  # Pipeline config loader
+python-dotenv>=1.0.0  # .env file loader
+torch>=2.1.0,<2.3.0  # Required for neural diarization models
+torchaudio>=2.1.0,<2.3.0  # Torch audio I/O helpers
+silero-vad>=4.0.0  # Voice Activity Detection (VAD) model
+pyannote.audio==3.1.1  # State-of-the-art diarization
+pyannote.core>=5.0.0,<6.0.0
+pyannote.metrics>=3.2.0,<4.0.0
+huggingface-hub>=0.30.0,<0.35.0  # Compatible with sentry_sdk and pyannote (patched for use_auth_token)
+
+# Cloud services
+boto3>=1.28.0  # AWS S3 upload
+google-auth>=2.23.0  # Google Drive authentication
+google-api-python-client>=2.100.0  # Google Drive API
+

@@ -1,0 +1,10 @@
+{
+  "row_index": 4,
+  "channel": "audio",
+  "original_url": "https://kgen-ai-labelling.s3.amazonaws.com/input-audio/2_mono_bengali_food.mp3",
+  "preprocessing_applied": [
+    "standardization:wav@16000"
+  ],
+  "original_size_bytes": 98732,
+  "processed_size_bytes": 786510
+}

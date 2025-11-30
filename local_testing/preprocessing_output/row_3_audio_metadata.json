@@ -1,0 +1,10 @@
+{
+  "row_index": 3,
+  "channel": "audio",
+  "original_url": "https://kgen-ai-labelling.s3.amazonaws.com/input-audio/1_mono_hindi_food.mp3",
+  "preprocessing_applied": [
+    "standardization:wav@16000"
+  ],
+  "original_size_bytes": 98348,
+  "processed_size_bytes": 783438
+}

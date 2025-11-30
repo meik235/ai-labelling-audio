@@ -1,0 +1,10 @@
+{
+  "row_index": 1,
+  "channel": "audio",
+  "original_url": "https://kgen-ai-labelling.s3.amazonaws.com/input-audio/english_weather_conversation_two_men.mp3",
+  "preprocessing_applied": [
+    "standardization:wav@16000"
+  ],
+  "original_size_bytes": 116685,
+  "processed_size_bytes": 929918
+}

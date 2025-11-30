@@ -1,0 +1,10 @@
+{
+  "row_index": 7,
+  "channel": "audio",
+  "original_url": "https://kgen-ai-labelling.s3.amazonaws.com/input-audio/5_stereo_hindi_gardening.mp3",
+  "preprocessing_applied": [
+    "standardization:wav@16000"
+  ],
+  "original_size_bytes": 390625,
+  "processed_size_bytes": 779918
+}

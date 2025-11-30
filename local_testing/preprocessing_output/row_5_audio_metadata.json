@@ -1,0 +1,10 @@
+{
+  "row_index": 5,
+  "channel": "audio",
+  "original_url": "https://kgen-ai-labelling.s3.amazonaws.com/input-audio/3_mono_hindi_fashion.mp3",
+  "preprocessing_applied": [
+    "standardization:wav@16000"
+  ],
+  "original_size_bytes": 209414,
+  "processed_size_bytes": 835542
+}
