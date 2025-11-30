@@ -1,7 +1,5 @@
-# @format
-
 clientConfig:
-  clientId: "Testing4"
+  clientId: "Testing0"
   workflow:
     preprocessing:
       enabled: true
@@ -71,7 +69,7 @@ clientConfig:
         # maxDurationSec: 30.0    # Maximum duration per chunk
         # overlapSec: 2.0         # Overlap between chunks (prevents word cutting)
       metadata:
-        includeFields: [duration, size]
+        includeFields: [duration, size] # includes the duration and size of the original audio in the metadata
 
   annotation:
     labelConfig: |
@@ -117,7 +115,7 @@ clientConfig:
 
 devConfig:
   labelStudio:
-    projectNamePrefix: AudioProjectTesting4
+    projectNamePrefix: AudioProjectTesting0
     description: Automated audio annotation pipeline
     templateId: audio-basic
     batchSize: 50

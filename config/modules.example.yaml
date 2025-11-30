@@ -1,187 +1,321 @@
-# @format
+# Configuration file for the audio annotation pipeline
+# This file defines the workflow, data sources, preprocessing, annotation, and post-processing settings
 
 clientConfig:
+  # Unique identifier for this client/project
   clientId: "client-demo"
 
+  # Workflow configuration - controls which pipeline stages are enabled
   workflow:
-    steps: [preprocessing, annotation, postProcessing]
+    # Preprocessing stage: validates and cleans audio files
     preprocessing:
       enabled: true
-      description: "Validate + clean audio"
+      description: "Data hygiene + audio cleanup"
+    # Annotation stage: Label Studio based QA + diarization
     annotation:
       enabled: true
-      description: "Label Studio QA workspace"
+      description: "Label Studio based QA + diarization"
+    # Post-processing stage: merges downstream outputs and exports final reports
     postProcessing:
       enabled: true
-      description: "Merge downstream deliverables"
+      description: "Merge downstream outputs + export"
 
+  # Data source configuration - where to read audio job data from
   dataSource:
-    type: csv # csv | dynamodb | api
-    csv:
-      path: data/user_responses.csv
-      delimiter: ","
+    # Type of data source: csv | dynamodb | api
+    type: csv
+    # DynamoDB configuration (used when type: dynamodb)
     dynamodb:
-      tableName: "demo-audio-jobs"
+      tableName: "audio-jobs"
       region: "us-east-1"
       filterExpression: "clientId = :clientId"
       projectionFields: [jobId, callId, audioUrl, metadata]
+    # CSV configuration (used when type: csv)
+    csv:
+      # Path to CSV file relative to project root
+      # Example files: user_responses_mono_no_pre.csv, user_responses_mono_with_pre.csv, user_responses_stereo_with_pre.csv
+      path: data/user_responses.csv
+      delimiter: ","
+    # API configuration (used when type: api)
     api:
-      endpoint: "https://api.demo.io/v1/jobs"
-      authType: bearer # none | basic | bearer
-      headers:
-        x-demo-client: "client-demo"
+      endpoint: ""
+      # Authentication type: none | basic | bearer
+      authType: none
+      headers: {}
+    # Audio location preferences - where audio files are stored
     audioLocationPreference:
-      preferred: s3 # s3 | gdrive | other
+      # Preferred storage location: s3 | gdrive | other
+      preferred: s3
+      # Whether to allow fallback to other locations if preferred fails
       allowFallback: true
+      # List of accepted storage locations
       acceptedLocations: [s3, gdrive]
 
+  # Preprocessing configuration - audio validation and cleaning
   preprocessing:
+    # S3 prefix for storing preprocessed audio files
+    s3_prefix: client-demo-preprocessing
+
+    # Validation settings - validates audio files before processing
     validation:
+      # Enable/disable validation checks
       enabled: true
-      allowedFormats: ["mp3", "wav", "m4a"]
+      # List of allowed audio formats (validation will reject other formats)
+      # Supported: mp3, wav, m4a, flac, aac, ogg
+      allowedFormats: ["mp3", "wav", "m4a", "flac", "aac", "ogg"]
+      # Duration constraints
       duration:
-        minSec: 1
-        maxSec: 3600
+        # Minimum audio duration in seconds (files shorter than this will be rejected)
+        min: 0.1
+        # Maximum audio duration in seconds (files longer than this will be rejected)
+        max: 3600
+      # File size constraints
       size:
-        maxMB: 200
+        # Maximum file size in MB (files larger than this will be rejected)
+        max: 1000
+      # Sample rate constraints
       sampleRate:
-        allowed: [16000, 44100]
+        # List of allowed sample rates in Hz (other rates will be rejected)
+        # Common values: 8000, 16000, 22050, 32000, 44100, 48000, 96000
+        allowed: [8000, 16000, 22050, 32000, 44100, 48000, 96000]
+      # Download settings for remote audio files
       download:
-        timeoutSec: 60
-        retryCount: 2
-        retryDelaySec: 5
-      rejectionWebhook:
-        url: "https://demo.rejection.webhook"
-        secret: "demo-secret-token"
+        # Timeout in seconds for downloading audio files
+        timeout: 60
+        # Retry configuration for failed downloads
+        retry:
+          # Number of retry attempts
+          count: 3
+          # Delay in seconds between retries
+          delay: 2
+      # Optional: Webhook URL for rejection notifications
+      # rejectionWebhook:
+      #   url: "https://your-webhook-url/rejections"
+      #   secret: "your-secret-token"
+
+    # Audio cleaning/processing configuration
     clearAudio:
+      # Enable/disable audio preprocessing (conversion, normalization, etc.)
       enabled: true
-      # Minimal conversion: ensure every asset hits AssemblyAI as mono 16 kHz WAV
+      # Target audio format - all audio is converted to this format
+      # Note: Audio is ALWAYS converted to mono (1 channel) regardless of input
+      # This ensures compatibility with AssemblyAI and consistent processing
       target:
-        format: "wav"
+        # Output format: wav (recommended for best compatibility)
+        format: wav
+        # Target sample rate in Hz (16000 is recommended for speech recognition)
         sampleRate: 16000
+
+      # Normalization: normalizes audio to a standard loudness level
+      # Useful for inconsistent audio levels across files
       normalization:
         enabled: false
+        # Normalization mode: "loudnorm" (static) or "dynaudnorm" (dynamic)
+        # mode: "loudnorm"
+        # Target loudness level in dB (default: -23.0)
+        # levelDB: -23.0
+
+      # Denoising: removes background noise from audio
+      # Useful for noisy recordings
       denoise:
         enabled: false
-      silenceTrim:
+        # Denoising intensity: "low" | "medium" | "high"
+        # intensity: "medium"
+
+      # Silence trimming: removes silence at the start and end of audio
+      # Useful for audio files with leading/trailing silence
+      trim:
         enabled: false
+        # dB threshold for silence detection (lower = more sensitive)
+        # silenceThreshold: -40.0
+        # Minimum duration of silence required to trim (in seconds)
+        # minSilenceDuration: 0.3
+
+      # Chunking: splits long audio files into smaller segments
+      # Useful for very long audio files that exceed processing limits
       chunking:
         enabled: false
-      metadata:
-        includeFields: [duration, sample_rate]
+        # Maximum duration per chunk in seconds
+        # maxDurationSec: 30.0
+        # Overlap between chunks in seconds (prevents word cutting at boundaries)
+        # overlapSec: 2.0
 
+      # Metadata extraction: which fields to include in task metadata
+      # These values come from the ORIGINAL audio file (before processing)
+      metadata:
+        # Available fields: duration, size, sample_rate, format, snr_db
+        # duration: Audio duration in seconds (from original file)
+        # size: File size in MB (from original file)
+        # sample_rate: Sample rate in Hz (from original file)
+        # format: Audio format (from original file)
+        # snr_db: Signal-to-noise ratio in dB (if noise checking enabled)
+        includeFields: [duration, size]
+
+  # Annotation configuration - Label Studio setup and transcription
   annotation:
+    # Label Studio label configuration (XML format)
+    # Defines the UI elements and labels for annotators
     labelConfig: |
       <View>
         <Labels name="labels" toName="audio">
-          <Label value="Speaker one" background="#D186FF"/>
-          <Label value="Speaker two" background="#FFB57F"/>
+          <Label value="Speaker one" background="#D186FF" hotkey="1"/>
+          <Label value="Speaker two" background="#1CE6FF" hotkey="2"/>
         </Labels>
         <Audio name="audio" value="$audio"/>
-        <TextArea name="transcription" toName="audio" rows="6" placeholder="Clean transcript goes here..."/>
+        <TextArea name="transcription_region" toName="audio" perRegion="true" rows="3" editable="true" placeholder="Segment transcription"/>
       </View>
+
+    # Pre-annotation settings
     preAnnotation:
+      # Enable/disable pre-annotation (automatic segment creation from ASR)
       enabled: true
+      # Schema for pre-annotation labels
       labelSchema:
+        # Fields to include in pre-annotation segments
         fields: [start, end, label, intent]
+
+    # Whether to run segments in Label Studio (create tasks for each segment)
+    runSegmentsInLabelStudio: true
+
+    # Transcription/ASR configuration
     transcription:
+      # Enable/disable automatic transcription
       enabled: true
+      # ASR (Automatic Speech Recognition) settings
       asr:
+        # ASR model: currently only "assemblyai" is supported
         model: assemblyai
-        language: en
+        # Language setting for transcription
+        # "auto" = automatic detection of all languages (recommended for multilingual)
+        # Other options: "hinglish" (auto-detect), "hi" (Hindi), "bn" (Bengali), "en" (English only)
+        language: auto
+        # Transcription task type: "transcribe" (standard) or "transcribe_plus" (with additional features)
         task: transcribe
-      timestamps:
+      # Timestamp format
+      timestamp:
+        # Format: "s" (seconds) or "ms" (milliseconds)
         format: s
+      # Output format for transcription
       output:
+        # Format: "json" (structured) or "text" (plain text)
         format: json
+      # Sentiment analysis (requires AssemblyAI premium features)
       sentiment:
         enabled: false
-    template:
-      id: demo-template
-      version: "1.0"
-      mapping:
-        rules:
-          - from: text
-            to: transcript
-    mlValidation:
-      enabled: false
-      min_confidence: 0.8
-      max_duration_diff_sec: 2.0
-      rules:
-        max_silence_gap_sec: 1.0
 
+    # Template configuration for Label Studio
+    template:
+      id: default-template
+      version: "1.0"
+      # Field mapping rules (empty by default)
+      mapping:
+        rules: []
+
+  # Post-processing configuration
   postProcessing:
+    # Enable/disable post-processing
     enabled: true
+    # Final report format: csv | json
     finalReportFormat: csv
-    extractAudioSegments: true
+    # Whether to extract individual audio segments from annotations
+    extractAudioSegments: false
+    # Merge strategy when combining human annotations with ASR results
+    # "prefer-human" = use human annotations when available, fallback to ASR
     mergeStrategy: prefer-human
+    # Output formats for final deliverables
+    # Available: json, csv, srt (subtitles), txt (plain text)
     outputFormats: [json, csv, srt, txt]
 
+# Development/operational configuration
 devConfig:
-  ingestion:
-    csv:
-      localFallbackPath: data/user_responses.csv
-    dynamodb:
-      tableName: "demo-audio-jobs"
-      region: "us-east-1"
-      batchSize: 25
-    s3:
-      bucket: "kgen-ai-labelling"
-      rawPrefix: "client/demo-project/raw"
-      processedPrefix: "client/demo-project/preprocessed"
-    runtimeChecks:
-      requireKnownSource: true
-      allowExternalAudio: true
-      externalSources: [gdrive]
-
+  # Label Studio configuration
   labelStudio:
-    projectNamePrefix: DEMO_
-    description: "Demo audio annotation"
-    templateId: ls_template_demo
-    batchSize: 25
+    # Prefix for Label Studio project names (projects will be named: {prefix}_{timestamp})
+    projectNamePrefix: AudioProjectDemo
+    # Description for Label Studio projects
+    description: Automated audio annotation pipeline
+    # Template ID for Label Studio projects
+    templateId: audio-basic
+    # Number of tasks to create per batch
+    batchSize: 50
+    # ML Backend configuration (for active learning)
     mlBackend:
-      enabled: true
-      url: https://demo-ml-backend
-      token: demo-ml-token
+      # Enable/disable ML backend integration
+      enabled: false
+      # ML backend URL (if enabled)
+      url: ""
+      # ML backend authentication token
+      token: ""
+    # Cloud storage configuration for Label Studio
     storage:
+      # Enable/disable automatic cloud storage setup
       enabled: true
+      # Storage type: s3 | gcs | azure
       type: s3
-      bucket: "kgen-ai-labelling"
-      prefix: "client/demo-project/raw"
-      region: "ap-south-1"
+      # S3 bucket name (or use S3_BUCKET environment variable)
+      bucket: ""
+      # AWS region (or use AWS_REGION environment variable, defaults to ap-south-1)
+      region: ""
+      # Optional: S3 prefix/folder path
+      prefix: ""
+      # Optional: AWS access key (or use AWS_ACCESS_KEY_ID environment variable)
       awsAccessKeyId: ""
+      # Optional: AWS secret key (or use AWS_SECRET_ACCESS_KEY environment variable)
       awsSecretAccessKey: ""
+      # Use blob URLs for audio files (recommended for large files)
       useBlobUrls: true
-      title: "Demo S3 Storage"
+      # Enable source storage (for original audio files)
       sourceEnabled: true
+      # Enable target storage (for processed audio files)
       targetEnabled: true
+    # Webhook configuration for Label Studio events
+    webhook:
+      # Enable/disable webhook notifications
+      enabled: true
+      # Webhook URL for Label Studio events (annotation updates, completions, etc.)
+      url: "http://localhost:8000/webhooks/label-studio/events"
+    # Run pre-annotation automatically when tasks are created
     runPreAnnotate: true
-    reviewerIds: [demoReviewer]
+    # List of reviewer user IDs (for assignment)
+    reviewerIds: []
+    # Export format for Label Studio exports
     export:
       format: json
-    webhook:
-      enabled: true
-      url: https://demo.labelstudio.webhook
 
+  # Post-processing operational settings
   postProcessing:
+    # Local file path for final CSV report
     final_csv_path: ./.tmp/final_report.csv
-    s3_prefix: client/demo-project/deliverables
+    # S3 prefix for storing final deliverables
+    s3_prefix: "client-demo-output"
+    # Configure which fields from Label Studio to include in final JSON output
+    # Field names must match the "name" attribute in your labelConfig
+    # Example: "transcription_region", "language", "notes", etc.
+    output_fields: [start, end, speaker, transcription, language, end_of_speech]
+    # Completion webhook - called when post-processing completes
     completionWebhook:
-      url: https://demo.completion.webhook
-      secret: demo-completion-secret
+      url: "http://localhost:8000/webhooks/pipeline-complete"
+      secret: ""
 
+  # Webhook endpoints for various pipeline events
   webhooks:
+    # Webhook for general rejection events
     rejection:
-      url: https://demo.rejection.webhook
-      secret: demo.reject.secret
+      url: http://localhost:8000/webhooks/label-studio
+      secret: ""
+    # Webhook specifically for Label Studio rejection events
     labelStudioRejection:
-      url: https://demo.labelstudio.rejection
-      secret: demo.labelstudio.secret
+      url: http://localhost:8000/webhooks/label-studio
+      secret: ""
+    # Webhook for post-processing completion events
     postProcessingComplete:
-      url: https://demo.postprocess.webhook
-      secret: demo-post-secret
+      url: http://localhost:8000/webhooks/pipeline-complete
+      secret: ""
 
+  # Rejection handler configuration (for AWS Lambda or similar)
   rejectionHandler:
     lambda:
-      functionName: DemoRejectionLambda
-      payloadFields: [row_index, reason, module, timestamp]
+      # Lambda function name for handling rejections
+      functionName: audio-rejection-handler
+      # Fields to include in rejection payload
+      payloadFields: [row_index, reason, module]
